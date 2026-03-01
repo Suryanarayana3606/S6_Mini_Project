@@ -1,0 +1,151 @@
+{% extends 'analytics/base.html' %}
+
+{% block page_title %}Sales Forecast{% endblock %}
+
+{% block content %}
+<div class="glass-card" style="margin-bottom: 2rem;">
+    <h3 style="margin-bottom: 1.5rem;">Revenue Forecast Model (90 Days)</h3>
+    <div class="chart-container" style="height: 400px;">
+        <canvas id="forecastChart"></canvas>
+    </div>
+</div>
+
+<div class="glass-card">
+    <h3 style="margin-bottom: 1.5rem;">Forecast Data Registry</h3>
+    <div style="overflow-x: auto;">
+        <table class="premium-table">
+            <thead>
+                <tr>
+                    <th>Forecast Date</th>
+                    <th>Product</th>
+                    <th>Predicted Revenue</th>
+                    <th>Lower Bound</th>
+                    <th>Upper Bound</th>
+                    <th>MAPE (%)</th>
+                    <th>Model</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for forecast in forecasts %}
+                <tr>
+                    <td>{{ forecast.forecast_date }}</td>
+                    <td>{{ forecast.product.product_name }}</td>
+                    <td style="font-weight: 600; color: var(--accent-primary);">${{ forecast.forecast_revenue }}</td>
+                    <td style="color: var(--text-secondary);">${{ forecast.lower_bound }}</td>
+                    <td style="color: var(--text-secondary);">${{ forecast.upper_bound }}</td>
+                    <td>{{ forecast.mape }}%</td>
+                    <td><span
+                            style="background: rgba(139, 92, 246, 0.2); color: #c4b5fd; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">{{
+                            forecast.model_version }}</span></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-secondary);">No forecast data
+                        available.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const dates = {{ forecast_dates| safe }};
+    const revenues = {{ forecast_revenues| safe }};
+    const lowerBounds = {{ lower_bounds| safe }};
+    const upperBounds = {{ upper_bounds| safe }};
+
+    const ctx = document.getElementById('forecastChart').getContext('2d');
+
+    // Smooth line chart with confidence intervals
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: 'Predicted Revenue',
+                    data: revenues,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: {
+                        target: 'origin',
+                        above: 'rgba(59, 130, 246, 0.1)'
+                    },
+                    pointBackgroundColor: '#0f172a',
+                    pointBorderColor: '#3b82f6',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Upper Bound',
+                    data: upperBounds,
+                    borderColor: 'rgba(148, 163, 184, 0)',
+                    backgroundColor: 'rgba(148, 163, 184, 0.1)',
+                    fill: '+1',
+                    tension: 0.4,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Lower Bound',
+                    data: lowerBounds,
+                    borderColor: 'rgba(148, 163, 184, 0)',
+                    backgroundColor: 'rgba(148, 163, 184, 0)',
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    grid: {
+                        color: 'rgba(255,255,255,0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#94a3b8',
+                        filter: function (item, chart) {
+                            return !item.text.includes('Bound');
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
