@@ -280,19 +280,19 @@
             <span>NexusAnalytics</span>
         </div>
         <ul class="nav-links">
-            <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+            <a href="{% url 'analytics:dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                 <span>Dashboard</span>
             </a>
-            <a href="{% url 'sales_forecast' %}" class="nav-item {% if request.resolver_match.url_name == 'sales_forecast' %}active{% endif %}">
+            <a href="{% url 'analytics:sales_forecast' %}" class="nav-item {% if request.resolver_match.url_name == 'sales_forecast' %}active{% endif %}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
                 <span>Sales Forecast</span>
             </a>
-            <a href="{% url 'segmentation' %}" class="nav-item {% if request.resolver_match.url_name == 'segmentation' %}active{% endif %}">
+            <a href="{% url 'analytics:segmentation' %}" class="nav-item {% if request.resolver_match.url_name == 'segmentation' %}active{% endif %}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 <span>Segmentation</span>
             </a>
-            <a href="{% url 'export_report' %}" class="nav-item">
+            <a href="{% url 'analytics:export_report' %}" class="nav-item">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                 <span>Export Report</span>
             </a>

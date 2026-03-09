@@ -80,21 +80,44 @@ def populate_db():
     print("Creating Sales Forecasts...")
     start_forecast = date(2026, 1, 1)
     
-    # Let's aggregate real data roughly to make forecast look somewhat "realistic" but we can just fake an upward trend
     for p in products:
-        base_daily_revenue = float(p.base_price) * random.uniform(2.0, 5.0)
-        for day in range(90):
-            f_date = start_forecast + timedelta(days=day)
-            # Add some sine wave + trend
-            trend = day * (base_daily_revenue * 0.05)
-            seasonality = (base_daily_revenue * 0.2) * random.uniform(0.8, 1.2)
-            noise = random.uniform(-0.1, 0.1) * base_daily_revenue
+        # Calculate historical baseline from the last 30 days of 2025
+        thirty_days_ago = end_date - timedelta(days=30)
+        recent_txns = Sales_Transaction.objects.filter(product=p, transaction_date__gte=thirty_days_ago)
+        
+        if recent_txns.exists():
+            historical_total = sum(t.revenue for t in recent_txns)
+            base_daily_revenue = float(historical_total) / 30.0
+        else:
+            # Fallback if no recent transactions exist for a product
+            base_daily_revenue = float(p.base_price) * random.uniform(0.5, 2.0)
             
-            f_rev = base_daily_revenue + trend + seasonality + noise
-            f_rev = max(500, f_rev) # no negative
+        # We want to forecast for 12 months
+        import math
+        for month_offset in range(12):
+            target_month = start_forecast.month + month_offset
+            target_year = start_forecast.year + (target_month - 1) // 12
+            target_month = (target_month - 1) % 12 + 1
+            f_date = date(target_year, target_month, 1)
             
-            lower_b = f_rev * 0.85
-            upper_b = f_rev * 1.15
+            # Since baseline was daily, scale to monthly (approx x30)
+            base_monthly_revenue = base_daily_revenue * 30.0
+            
+            # Predict based on historical average with a mild trend
+            trend = month_offset * (base_monthly_revenue * 0.02) # Milder linear upward trend
+            
+            # 12-month annual cycle
+            seasonality_angle = (month_offset / 12.0) * 2 * math.pi
+            seasonality = (base_monthly_revenue * 0.25) * math.sin(seasonality_angle)
+            
+            # Random noise (± 10%)
+            noise = random.uniform(-0.10, 0.10) * base_monthly_revenue
+            
+            f_rev = base_monthly_revenue + trend + seasonality + noise
+            f_rev = max(float(p.base_price) * 3.0, f_rev) # Should not drop below a fraction of base price per month
+            
+            lower_b = f_rev * random.uniform(0.80, 0.90)
+            upper_b = f_rev * random.uniform(1.10, 1.20)
             
             Sales_Forecast.objects.create(
                 product=p,
@@ -102,8 +125,8 @@ def populate_db():
                 forecast_revenue=Decimal(round(f_rev, 2)),
                 lower_bound=Decimal(round(lower_b, 2)),
                 upper_bound=Decimal(round(upper_b, 2)),
-                model_version='v2.4-ARIMA',
-                mape=Decimal(round(random.uniform(3.0, 8.0), 2))
+                model_version='v3.0-HistoryAnchored',
+                mape=Decimal(round(random.uniform(2.0, 6.0), 2))
             )
 
     # 5. Create FM Customer Segments

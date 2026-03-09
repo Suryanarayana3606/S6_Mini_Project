@@ -1,12 +1,37 @@
 {% extends 'analytics/base.html' %}
+{% load humanize %}
 
 {% block page_title %}Sales Dashboard{% endblock %}
 
 {% block content %}
+<form method="GET" action="{% url 'analytics:dashboard' %}" class="glass-card" style="margin-bottom: 2rem; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem;">
+    <div style="display: flex; gap: 2rem; flex: 1;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <label style="color: var(--text-secondary); font-weight: 600; font-size: 0.9rem;">Industry:</label>
+            <select name="industry" style="background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem 1rem; border-radius: 4px; font-size: 0.9rem; outline: none; cursor: pointer;">
+                <option value="">All Industries</option>
+                {% for ind in industries %}
+                <option value="{{ ind }}" {% if ind == selected_industry %}selected{% endif %}>{{ ind }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <label style="color: var(--text-secondary); font-weight: 600; font-size: 0.9rem;">Region:</label>
+            <select name="region" style="background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem 1rem; border-radius: 4px; font-size: 0.9rem; outline: none; cursor: pointer;">
+                <option value="">All Regions</option>
+                {% for reg in regions %}
+                <option value="{{ reg }}" {% if reg == selected_region %}selected{% endif %}>{{ reg }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <button type="submit" style="background: var(--accent-primary); color: #000; border: none; padding: 0.6rem 1.5rem; border-radius: 4px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">APPLY FILTERS</button>
+</form>
+
 <div class="grid-stats">
     <div class="glass-card">
         <div class="stat-label">Total Revenue</div>
-        <div class="stat-value">${{ total_revenue|floatformat:2 }}</div>
+        <div class="stat-value">${{ total_revenue|floatformat:0|intcomma }}</div>
         <div style="color: #10b981; font-weight: 600; font-size: 0.85rem;">+14.5% vs last month</div>
     </div>
     <div class="glass-card">

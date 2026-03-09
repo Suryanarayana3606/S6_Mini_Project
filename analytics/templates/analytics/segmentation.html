@@ -3,6 +3,13 @@
 {% block page_title %}Customer Segmentation{% endblock %}
 
 {% block content %}
+<div class="glass-card" style="margin-bottom: 2rem;">
+    <h3 style="margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem;">Customer Value Clusters (K-Means Simulation)</h3>
+    <div class="chart-container" style="height: 400px;">
+        <canvas id="scatterChart"></canvas>
+    </div>
+</div>
+
 <div class="grid-charts">
     <div class="glass-card">
         <h3 style="margin-bottom: 1.5rem;">Segment Distribution</h3>
@@ -109,8 +116,45 @@
 <script>
     const labels = {{ chart_labels| safe }};
     const data = {{ chart_data| safe }};
+    const scatterDatasets = {{ scatter_datasets| safe }};
 
-    const ctx = document.getElementById('segmentChart').getContext('2d');
+    const doughnutCtx = document.getElementById('segmentChart').getContext('2d');
+    const scatterCtx = document.getElementById('scatterChart').getContext('2d');
+
+    // Scatter Chart (K-Means Clusters)
+    new Chart(scatterCtx, {
+        type: 'scatter',
+        data: {
+            datasets: scatterDatasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: { display: true, text: 'Recency (Days)', color: '#94a3b8' },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                },
+                y: {
+                    title: { display: true, text: 'Monetary Value ($)', color: '#94a3b8' },
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: '#94a3b8' }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: Recency ${context.parsed.x} days, LTV $${context.parsed.y}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
 
     // Dynamic premium colors for the doughnut chart
     const colors = [
@@ -124,7 +168,7 @@
 
     const bgColors = colors.map(c => c + 'CC');
 
-    new Chart(ctx, {
+    new Chart(doughnutCtx, {
         type: 'doughnut',
         data: {
             labels: labels,
