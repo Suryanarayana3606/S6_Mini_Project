@@ -50,31 +50,93 @@ def populate_db():
         )
         customers.append(c)
 
-    # 3. Create Sales Transactions (Past 1 Year)
-    print("Creating Sales Transactions...")
+    # 3. Create Sales Transactions (Past 3 Years for better ML training)
+    print("Creating Realistic Sales Transactions (3 Years)...")
+    
+    # Create non-uniform distribution of customer weights (Zipf/Pareto-like)
+    customer_weights = [1.0 / (i + 1)**1.2 for i in range(len(customers))]
+    random.shuffle(customer_weights)
     end_date = date(2025, 12, 31)
-    # create about 800 transactions
-    for _ in range(800):
-        c = random.choice(customers)
-        p = random.choice(products)
-        qty = random.randint(1, 20)
-        # random date in last 365 days from end of 2025
-        days_ago = random.randint(0, 365)
-        txn_date = end_date - timedelta(days=days_ago)
+    start_date = end_date - timedelta(days=3*365)
+    
+    import math
+    
+    transactions_to_create = []
+    
+    # Pre-calculate daily base volume for each product
+    product_profiles = {}
+    for p in products:
+        # Give each product a unique baseline volume and seasonality offset
+        base_daily_sales = random.uniform(0.5, 3.0) 
+        seasonality_shift = random.uniform(0, math.pi * 2) # Peak at different times of year
+        growth_rate = random.uniform(0.0005, 0.002) # Daily growth trend
+        product_profiles[p.product_id] = {
+            'base': base_daily_sales,
+            'shift': seasonality_shift,
+            'growth': growth_rate,
+            'product': p
+        }
+
+    current_date = start_date
+    day_index = 0
+    
+    while current_date <= end_date:
+        # Day of year (1-365) for seasonality
+        day_of_year = current_date.timetuple().tm_yday
+        seasonality_angle = (day_of_year / 365.0) * 2 * math.pi
         
-        # slight price variation
-        actual_price = p.base_price * Decimal(random.uniform(0.9, 1.1))
-        actual_price = round(actual_price, 2)
-        revenue = actual_price * qty
+        for p_id, profile in product_profiles.items():
+            p = profile['product']
+            
+            # 1. Base volume
+            volume = profile['base']
+            
+            # 2. Add linear trend (business growing over 3 years)
+            trend = day_index * profile['growth']
+            
+            # 3. Add seasonality (sine wave peaking at specific times of year)
+            season = math.sin(seasonality_angle + profile['shift']) * (profile['base'] * 0.8)
+            
+            # 4. Add some noise/randomness
+            noise = random.uniform(-0.5, 0.5)
+            
+            # Calculate expected sales for this product today
+            expected_qty = volume + trend + season + noise
+            
+            # Convert to actual integer sales (sometimes 0, sometimes multiple items)
+            # Use Poisson-like logic (simplified):
+            if expected_qty > 0:
+                # 70% chance to actually have a sale on a given day if expected > 0
+                if random.random() < 0.70:
+                    # Randomize quantity around the expected value
+                    qty = max(1, int(random.gauss(expected_qty, expected_qty * 0.2)))
+                    c = random.choices(customers, weights=customer_weights)[0]
+                    
+                    # Slight price variation
+                    actual_price = float(p.base_price) * random.uniform(0.95, 1.05)
+                    revenue = actual_price * qty
+                    
+                    transactions_to_create.append(Sales_Transaction(
+                        transaction_date=current_date,
+                        customer=c,
+                        product=p,
+                        quantity=qty,
+                        unit_price=actual_price,
+                        revenue=revenue
+                    ))
         
-        Sales_Transaction.objects.create(
-            transaction_date=txn_date,
-            customer=c,
-            product=p,
-            quantity=qty,
-            unit_price=actual_price,
-            revenue=revenue
-        )
+        current_date += timedelta(days=1)
+        day_index += 1
+        
+        # Insert in batches to prevent memory issues
+        if len(transactions_to_create) >= 5000:
+            Sales_Transaction.objects.bulk_create(transactions_to_create)
+            transactions_to_create = []
+
+    # Insert any remaining transactions
+    if transactions_to_create:
+        Sales_Transaction.objects.bulk_create(transactions_to_create)
+
 
     # 4. Create Sales Forecasts (Next 3 months, roughly 90 days from Jan 1 2026)
     print("Creating Sales Forecasts...")
@@ -131,6 +193,10 @@ def populate_db():
 
     # 5. Create FM Customer Segments
     print("Calculating and Creating FM Customer Segments...")
+    import pandas as pd
+    
+    rfm_data = []
+    
     # Calculate R,F,M from the transactions
     for c in customers:
         txns = Sales_Transaction.objects.filter(customer=c)
@@ -142,55 +208,61 @@ def populate_db():
         frequency = txns.count()
         monetary = txns.aggregate(Sum('revenue'))['revenue__sum'] or Decimal(0)
         
-        # Simple scoring logic (1-5 where 5 is best)
-        # Recency: lower is better (5 is best)
-        if recency_days <= 30: r = 5
-        elif recency_days <= 60: r = 4
-        elif recency_days <= 90: r = 3
-        elif recency_days <= 180: r = 2
-        else: r = 1
-            
-        # Frequency: higher is better
-        if frequency >= 20: f_s = 5
-        elif frequency >= 15: f_s = 4
-        elif frequency >= 10: f_s = 3
-        elif frequency >= 5: f_s = 2
-        else: f_s = 1
-            
-        # Monetary: higher is better
-        if monetary >= 50000: m = 5
-        elif monetary >= 30000: m = 4
-        elif monetary >= 15000: m = 3
-        elif monetary >= 5000: m = 2
-        else: m = 1
-            
-        rfm = int(f"{r}{f_s}{m}")
+        rfm_data.append({
+            'customer': c,
+            'recency': recency_days,
+            'frequency': frequency,
+            'monetary': float(monetary)
+        })
         
-        # Assign segment
-        if r >= 4 and f_s >= 4 and m >= 4:
-            seg = 'Champions'
-        elif r >= 3 and f_s >= 3 and m >= 3:
-            seg = 'Loyal Customers'
-        elif r <= 2 and m >= 3:
-            seg = 'At Risk'
-        elif r >= 4 and f_s <= 2:
-            seg = 'New Customers'
-        elif r <= 2 and f_s <= 2:
-            seg = 'Lost'
-        else:
-            seg = 'Promising'
+    if rfm_data:
+        df_rfm = pd.DataFrame(rfm_data)
+        
+        # Rank scores (1 to 5) using quantiles
+        df_rfm['r_rank'] = df_rfm['recency'].rank(method='first', ascending=False)
+        df_rfm['f_rank'] = df_rfm['frequency'].rank(method='first', ascending=True)
+        df_rfm['m_rank'] = df_rfm['monetary'].rank(method='first', ascending=True)
+        
+        df_rfm['r_score'] = pd.qcut(df_rfm['r_rank'], 5, labels=[1, 2, 3, 4, 5])
+        df_rfm['f_score'] = pd.qcut(df_rfm['f_rank'], 5, labels=[1, 2, 3, 4, 5])
+        df_rfm['m_score'] = pd.qcut(df_rfm['m_rank'], 5, labels=[1, 2, 3, 4, 5])
+        
+        for _, row in df_rfm.iterrows():
+            c = row['customer']
+            recency_days = int(row['recency'])
+            frequency = int(row['frequency'])
+            monetary = Decimal(row['monetary'])
+            r = int(row['r_score'])
+            f_s = int(row['f_score'])
+            m = int(row['m_score'])
             
-        FM_Customer_Segment.objects.create(
-            customer=c,
-            recency=recency_days,
-            frequency=frequency,
-            monetary=monetary,
-            r_score=r,
-            f_score=f_s,
-            m_score=m,
-            rfm_score=rfm,
-            segment=seg
-        )
+            rfm = int(f"{r}{f_s}{m}")
+            
+            # Assign segment
+            if r >= 4 and f_s >= 4 and m >= 4:
+                seg = 'Champions'
+            elif r >= 3 and f_s >= 3 and m >= 3:
+                seg = 'Loyal'
+            elif r <= 2 and m >= 3:
+                seg = 'At Risk'
+            elif r >= 4 and f_s <= 2:
+                seg = 'New'
+            elif r <= 2 and f_s <= 2:
+                seg = 'Lost'
+            else:
+                seg = 'Promising'
+                
+            FM_Customer_Segment.objects.create(
+                customer=c,
+                recency=recency_days,
+                frequency=frequency,
+                monetary=monetary,
+                r_score=r,
+                f_score=f_s,
+                m_score=m,
+                rfm_score=rfm,
+                segment=seg
+            )
 
     print("Database population complete!")
 

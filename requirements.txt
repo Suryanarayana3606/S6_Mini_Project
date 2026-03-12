@@ -1,2 +1,6 @@
 Django
 Faker
+scikit-learn
+xgboost
+pandas
+joblib
